@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZENITH • Print Switch Manager</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --surface-alt: #f1f5f9;
+            --border: #e2e8f0;
+            --border-active: #6366f1;
+            --primary: #6366f1;
+            --primary-light: #818cf8;
+            --accent: #0ea5e9;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+            --shadow-lg: 0 10px 25px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04);
+            --shadow-xl: 0 20px 50px -6px rgba(0,0,0,0.1);
+            --radius-xl: 24px;
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+            --font: 'Plus Jakarta Sans', system-ui, sans-serif;
+            --mono: 'JetBrains Mono', monospace;
+            --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        .bg-pattern {
+            position: fixed; inset: 0; pointer-events: none; z-index: 0;
+            background-image: radial-gradient(circle, #cbd5e1 1px, transparent 1px);
+            background-size: 40px 40px;
+            opacity: 0.4;
+        }
+
+        .topbar {
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(255,255,255,0.9); backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 28px;
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 0.82rem; font-weight: 600;
+        }
+        .topbar-left, .topbar-right { display: flex; align-items: center; gap: 24px; }
+        .topbar-item { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); }
+        .dot-live { width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 10px #10b981; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        .btn-ghost {
+            padding: 7px 18px; border-radius: 24px; border: 1px solid var(--border);
+            background: var(--surface); color: var(--text-secondary); cursor: pointer;
+            font-family: var(--font); font-size: 0.8rem; font-weight: 600;
+            transition: var(--transition); display: flex; align-items: center; gap: 6px;
+        }
+        .btn-ghost:hover { border-color: var(--primary); color: var(--primary); background: #eef2ff; }
+
+        .app-shell {
+            position: relative; z-index: 1;
+            max-width: 1440px; margin: 0 auto; padding: 28px 24px 0;
+            display: grid; grid-template-columns: 1fr 380px; gap: 24px;
+        }
+        @media (max-width: 1200px) { .app-shell { grid-template-columns: 1fr; } }
+
+        .card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius-xl); padding: 24px 28px;
+            box-shadow: var(--shadow-md); transition: var(--transition);
+            margin-bottom: 20px;
+        }
+        .card:hover { box-shadow: var(--shadow-lg); }
+        .card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border);
+        }
+        .card-title { font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 10px; }
+        .card-title i { color: var(--primary); }
+
+        .switch-visual {
+            background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+            border: 2px solid #c7d2fe;
+            border-radius: var(--radius-lg);
+            padding: 18px 20px;
+            margin-bottom: 18px;
+            display: flex; align-items: center; gap: 14px;
+        }
+        .switch-icon {
+            width: 52px; height: 52px; border-radius: 16px;
+            background: linear-gradient(135deg, #6366f1, #818cf8);
+            color: #fff; display: flex; align-items: center; justify-content: center;
+            font-size: 24px; box-shadow: 0 8px 24px rgba(99,102,241,0.25);
+        }
+        .switch-info { flex: 1; }
+        .switch-name { font-weight: 800; font-size: 1rem; }
+        .switch-meta { font-size: 0.78rem; color: var(--text-secondary); }
+
+        .printer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+        .printer-card {
+            background: var(--surface-alt); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); padding: 16px;
+            transition: var(--transition); cursor: pointer;
+        }
+        .printer-card.default { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+        .printer-card:hover { border-color: var(--primary-light); }
+        .printer-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .printer-card-icon {
+            width: 38px; height: 38px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center; font-size: 18px;
+        }
+        .printer-card-icon.usb { background: #e0e7ff; color: #4f46e5; }
+        .printer-card-icon.bt { background: #dbeafe; color: #2563eb; }
+        .printer-card-icon.net { background: #cffafe; color: #0891b2; }
+        .printer-card-name { font-weight: 700; font-size: 0.88rem; }
+        .printer-card-meta { font-size: 0.74rem; color: var(--text-muted); }
+        .badge-sm {
+            display: inline-block; padding: 3px 12px; border-radius: 14px;
+            font-size: 0.7rem; font-weight: 700;
+        }
+        .badge-ready { background: #d1fae5; color: #065f46; }
+        .badge-busy { background: #fef3c7; color: #92400e; }
+        .badge-off { background: #f1f5f9; color: #64748b; }
+
+        .dropzone {
+            border: 2px dashed var(--border); border-radius: var(--radius-lg);
+            padding: 30px; text-align: center; cursor: pointer;
+            transition: var(--transition); background: #fafafa;
+        }
+        .dropzone:hover { border-color: var(--primary); background: #eef2ff; }
+        .dropzone.active { border-color: var(--success); background: #f0fdf4; }
+        .dropzone-icon { font-size: 2.8rem; margin-bottom: 8px; display: block; }
+        .chip {
+            padding: 5px 14px; background: var(--surface); border: 1px solid var(--border);
+            border-radius: 20px; font-size: 0.76rem; font-weight: 600;
+            color: var(--text-secondary); display: inline-flex; align-items: center; gap: 5px; margin: 3px;
+        }
+
+        .btn-primary {
+            width: 100%; padding: 14px; margin-top: 14px;
+            background: linear-gradient(135deg, #6366f1, #818cf8);
+            border: none; border-radius: var(--radius-md); color: #fff;
+            font-weight: 700; font-size: 0.95rem; cursor: pointer;
+            font-family: var(--font); display: flex; align-items: center;
+            justify-content: center; gap: 8px; transition: var(--transition);
+            box-shadow: 0 8px 24px rgba(99,102,241,0.25);
+        }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 14px 36px rgba(99,102,241,0.4); }
+        .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.4); }
+
+        .alert-inline {
+            display: none; padding: 10px 14px; border-radius: var(--radius-sm);
+            font-weight: 600; font-size: 0.82rem; margin-top: 10px; align-items: center; gap: 8px;
+        }
+        .alert-inline.show { display: flex; }
+        .alert-err { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
+        .alert-warn { background: #fffbeb; border: 1px solid #fde68a; color: #d97706; }
+        .alert-ok { background: #f0fdf4; border: 1px solid #bbf7d0; color: #065f46; }
+
+        .side-panel { display: flex; flex-direction: column; gap: 18px; }
+        .stat-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .stat-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); padding: 16px; text-align: center;
+            box-shadow: var(--shadow-sm);
+        }
+        .stat-value { font-family: var(--mono); font-size: 1.5rem; font-weight: 700; }
+        .stat-label-sm { font-size: 0.7rem; color: var(--text-muted); margin-top: 4px; font-weight: 600; }
+        .text-purple { color: #6366f1; } .text-green { color: #10b981; } .text-amber { color: #f59e0b; } .text-rose { color: #f43f5e; }
+
+        .feed-list { max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+        .feed-item {
+            display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+            background: var(--surface-alt); border-radius: var(--radius-sm);
+            border: 1px solid var(--border); font-size: 0.8rem;
+            animation: feedIn 0.4s ease;
+        }
+        @keyframes feedIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:none; } }
+        .feed-item.external { border-left: 3px solid #f59e0b; }
+
+        .bottom-shell { position: relative; z-index:1; max-width:1440px; margin:0 auto; padding:0 24px 28px; }
+        .tab-bar {
+            display: flex; gap: 4px; background: var(--surface);
+            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+            padding: 6px; border: 1px solid var(--border); border-bottom: none;
+            box-shadow: var(--shadow-md);
+        }
+        .tab {
+            flex:1; padding: 12px 18px; border: none; background: transparent;
+            cursor: pointer; font-weight: 700; font-size: 0.84rem;
+            color: var(--text-muted); transition: var(--transition);
+            border-radius: 18px; font-family: var(--font);
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .tab.active { background: var(--primary); color: #fff; box-shadow: 0 4px 16px rgba(99,102,241,0.3); }
+        .tab-content {
+            background: var(--surface); border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+            padding: 22px; border: 1px solid var(--border); border-top: none;
+            min-height: 280px; box-shadow: var(--shadow-md);
+        }
+        .hidden { display: none !important; }
+
+        .receipt-card {
+            max-width: 440px; margin: 0 auto; background: #fff;
+            color: #1e293b; border: 2px solid #e2e8f0;
+            border-radius: 12px; padding: 24px 20px; font-size: 0.85rem;
+            display: none; animation: fadeUp 0.4s ease;
+            box-shadow: var(--shadow-lg);
+        }
+        .receipt-card.show { display: block; }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+        .receipt-line { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #f1f5f9; }
+        .receipt-total { border-top:2px solid #e2e8f0; margin-top:6px; padding-top:8px; font-weight:800; font-size:1.1rem; color:#6366f1; }
+
+        .table-z { width:100%; border-collapse:collapse; font-size:0.82rem; }
+        .table-z th { text-align:left; padding:11px 14px; background:#f8fafc; border-bottom:2px solid #e2e8f0; font-weight:700; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-muted); }
+        .table-z td { padding:10px 14px; border-bottom:1px solid #f1f5f9; color:var(--text-secondary); }
+        .table-z tr:hover td { background:#eef2ff; }
+
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,0.7); z-index:9999; align-items:center; justify-content:center; backdrop-filter:blur(6px); }
+        .modal-overlay.active { display:flex; }
+        .modal-box { background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius-xl); padding:28px; max-width:460px; width:94%; box-shadow:var(--shadow-xl); animation:popIn 0.35s ease; }
+        @keyframes popIn { from{transform:scale(0.9);opacity:0} to{transform:none;opacity:1} }
+        .modal-input { width:100%; padding:11px; background:#f8fafc; border:1.5px solid var(--border); border-radius:var(--radius-sm); color:var(--text); font-family:var(--mono); font-size:0.88rem; margin-bottom:10px; outline:none; }
+
+        .locked-overlay { display:none; position:fixed; inset:0; background:rgba(255,255,255,0.98); z-index:99999; align-items:center; justify-content:center; flex-direction:column; }
+        .locked-overlay.active { display:flex; }
+    </style>
+</head>
+<body>
+    <div class="bg-pattern"></div>
+
+    <header class="topbar">
+        <div class="topbar-left">
+            <div class="topbar-item"><div class="dot-live"></div> ZENITH Switch • Tous les postes connectés</div>
+            <div class="topbar-item"><i class="fas fa-network-wired"></i> Switch Principal : <span id="switchStatus">Actif</span></div>
+        </div>
+        <div class="topbar-right">
+            <span style="color:var(--text-muted);">🖨️ <span id="printerCount">3</span> imprimantes partagées</span>
+            <button class="btn-ghost" id="adminBtn"><i class="fas fa-shield-haltered"></i> Super‑Utilisateur</button>
+        </div>
+    </header>
+
+    <div class="app-shell">
+        <div>
+            <div class="switch-visual">
+                <div class="switch-icon"><i class="fas fa-server"></i></div>
+                <div class="switch-info">
+                    <div class="switch-name">Switch Principal • ZENITH-NET</div>
+                    <div class="switch-meta">Tous les ordinateurs du réseau local partagent ces imprimantes via le switch</div>
+                </div>
+                <span class="badge-sm badge-ready">● Connecté</span>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-print"></i> Imprimantes reliées au Switch</div>
+                    <button class="btn-ghost" id="addPrinterBtn"><i class="fas fa-plus"></i> Ajouter</button>
+                </div>
+                <div class="printer-grid" id="printerGrid"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-cloud-upload-alt"></i> Document à imprimer</div>
+                    <select id="printerSelect" class="select-field" style="width:auto;padding:8px 32px 8px 14px;font-size:0.8rem;border:1.5px solid var(--border);border-radius:24px;background:#f8fafc;">
+                        <option value="">Imprimante par défaut</option>
+                    </select>
+                </div>
+                <div class="dropzone" id="dropzone">
+                    <span class="dropzone-icon">📄</span>
+                    <strong>Glissez‑déposez votre fichier</strong>
+                    <div style="color:var(--text-muted);font-size:0.84rem;margin-top:5px;">Tous les postes peuvent imprimer via le switch</div>
+                    <div style="margin-top:10px;">
+                        <span class="chip"><i class="fas fa-file-pdf"></i> PDF</span>
+                        <span class="chip"><i class="fas fa-file-word"></i> DOC</span>
+                        <span class="chip"><i class="fas fa-file-alt"></i> DOCX</span>
+                    </div>
+                    <input type="file" id="fileInput" accept=".pdf,.doc,.docx" hidden>
+                </div>
+                <div class="alert-inline alert-ok" id="fileOk"></div>
+                <div class="alert-inline alert-err" id="fileErr"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="card-title"><i class="fas fa-sliders-h"></i> Paramètres</div></div>
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                    <div style="display:flex;gap:10px;">
+                        <label style="flex:1;text-align:center;padding:12px;background:#f8fafc;border:2px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-weight:600;font-size:0.85rem;"><input type="radio" name="printType" value="couleur" checked hidden> 🎨 Couleur <small style="color:var(--text-muted);">25 F</small></label>
+                        <label style="flex:1;text-align:center;padding:12px;background:#f8fafc;border:2px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-weight:600;font-size:0.85rem;"><input type="radio" name="printType" value="nb" hidden> ⚫ N&B <small style="color:var(--text-muted);">15 F</small></label>
+                        <label style="flex:1;text-align:center;padding:12px;background:#f8fafc;border:2px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-weight:600;font-size:0.85rem;"><input type="radio" name="printType" value="rectoverso" hidden> 📄 Recto‑Verso <small style="color:var(--text-muted);">17 F</small></label>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div><label style="font-weight:600;font-size:0.72rem;text-transform:uppercase;color:var(--text-muted);">Exemplaires</label><input type="number" id="copies" class="input-field" min="1" max="100" value="1" style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font);"></div>
+                        <div><label style="font-weight:600;font-size:0.72rem;text-transform:uppercase;color:var(--text-muted);">Format</label><select id="format" class="select-field" style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font);background:#f8fafc;"><option value="A4">A4</option><option value="A3">A3</option><option value="Lettre">Lettre</option><option value="Legal">Légal</option></select></div>
+                    </div>
+                    <div class="alert-inline alert-warn" id="manualBox" style="display:none;">
+                        <i class="fas fa-edit"></i> Pages estimées : <input type="number" id="manualPages" min="1" value="1" style="width:70px;padding:6px;margin-left:6px;border:1.5px solid var(--border);border-radius:6px;">
+                    </div>
+                </div>
+                <button class="btn-primary" id="launchBtn" disabled><i class="fas fa-paper-plane"></i> Envoyer au Switch</button>
+                <div class="alert-inline alert-err" id="validationErr"></div>
+            </div>
+        </div>
+
+        <div class="side-panel">
+            <div class="card" style="padding:18px;">
+                <div class="card-header" style="margin-bottom:8px;"><div class="card-title"><div class="dot-live"></div> Activité réseau</div></div>
+                <div class="feed-list" id="feedList"><div style="text-align:center;color:var(--text-muted);padding:20px;">En attente de travaux...</div></div>
+            </div>
+            <div class="card" style="padding:18px;">
+                <div class="card-header" style="margin-bottom:8px;"><div class="card-title"><i class="fas fa-chart-pie"></i> Compteurs</div></div>
+                <div class="stat-cards">
+                    <div class="stat-card"><div class="stat-value text-purple" id="todayPages">0</div><div class="stat-label-sm">Pages aujourd'hui</div></div>
+                    <div class="stat-card"><div class="stat-value text-green" id="todayPrints">0</div><div class="stat-label-sm">Impressions</div></div>
+                </div>
+                <div class="stat-cards" style="margin-top:8px;">
+                    <div class="stat-card"><div class="stat-value text-amber" id="todayRevenue">0 F</div><div class="stat-label-sm">Revenu jour</div></div>
+                    <div class="stat-card"><div class="stat-value text-rose" id="monthRevenue">0 F</div><div class="stat-label-sm">Revenu mois</div></div>
+                </div>
+                <div style="margin-top:8px;text-align:center;font-size:0.72rem;color:var(--text-muted);">💰 Année : <strong id="yearRevenue">0 F</strong></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-shell">
+        <div class="tab-bar">
+            <button class="tab active" data-tab="receipt"><i class="fas fa-receipt"></i> Reçu</button>
+            <button class="tab" data-tab="history"><i class="fas fa-history"></i> Historique Switch <span id="histCount">0</span></button>
+        </div>
+        <div class="tab-content">
+            <div id="receiptPanel">
+                <div class="receipt-card" id="receiptCard">
+                    <div style="height:3px;background:linear-gradient(90deg,#6366f1,#0ea5e9,#10b981);border-radius:2px;margin-bottom:16px;"></div>
+                    <div style="text-align:center;margin-bottom:12px;"><strong style="font-size:1.3rem;">ZENITH SWITCH</strong><br><span style="font-size:0.62rem;text-transform:uppercase;letter-spacing:2px;color:#6366f1;font-weight:700;">Reçu</span></div>
+                    <div class="receipt-line"><span style="color:#64748b;">Date</span><span id="rDate">-</span></div>
+                    <div class="receipt-line"><span style="color:#64748b;">N°</span><span id="rOrder" style="font-family:monospace;">-</span></div>
+                    <div class="receipt-line"><span style="color:#64748b;">Imprimante</span><span id="rPrinter">-</span></div>
+                    <div class="receipt-line"><span style="color:#64748b;">Document</span><span id="rDoc">-</span></div>
+                    <div class="receipt-line"><span style="color:#64748b;">Pages × Copies</span><span id="rPages">-</span></div>
+                    <div class="receipt-line"><span style="color:#64748b;">Type</span><span id="rType">-</span></div>
+                    <div class="receipt-line receipt-total"><span>TOTAL (sans TVA)</span><span id="rTotal">-</span></div>
+                    <button class="btn-primary" id="printReceiptBtn" style="margin-top:10px;"><i class="fas fa-print"></i> Imprimer reçu</button>
+                </div>
+                <div id="noReceipt" style="text-align:center;padding:40px;color:var(--text-muted);">Lancez une impression</div>
+            </div>
+            <div id="historyPanel" class="hidden">
+                <div style="display:flex;justify-content:space-between;margin-bottom:12px;"><span style="font-weight:600;">Travaux d'impression</span><button class="btn-ghost" id="exportCsv"><i class="fas fa-download"></i> CSV</button></div>
+                <div style="overflow-x:auto;"><table class="table-z"><thead><tr><th>Date</th><th>Poste</th><th>Document</th><th>Pages</th><th>Type</th><th>Qté</th><th>Imprimante</th><th>Total</th></tr></thead><tbody id="histBody"></tbody></table></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Super‑Utilisateur -->
+    <div class="modal-overlay" id="adminModal">
+        <div class="modal-box">
+            <h3 style="margin-bottom:10px;"><i class="fas fa-skull" style="color:#ef4444;"></i> Super‑Utilisateur</h3>
+            <p style="font-size:0.75rem;color:#d97706;margin-bottom:12px;background:#fffbeb;padding:8px;border-radius:8px;">⚠️ 3 échecs = alerte + verrouillage<br><small>Identifiants : <strong>ZenithAdmin</strong> / <strong>admin@zenith.pro</strong> / <strong>+237600000000</strong> / <strong>Zenith2024!</strong></small></p>
+            <input type="text" id="adminName" class="modal-input" placeholder="Nom">
+            <input type="email" id="adminEmail" class="modal-input" placeholder="Email">
+            <input type="tel" id="adminPhone" class="modal-input" placeholder="Téléphone">
+            <input type="password" id="adminPass" class="modal-input" placeholder="Mot de passe">
+            <div id="attemptInfo" style="text-align:center;font-size:0.8rem;color:#dc2626;margin:6px 0;">Tentatives : <strong id="attemptLeft">3</strong></div>
+            <div style="display:flex;gap:8px;">
+                <button class="btn-ghost" id="cancelAdmin" style="flex:1;">Annuler</button>
+                <button class="btn-primary" id="confirmAdmin" style="flex:1;background:linear-gradient(135deg,#dc2626,#991b1b);">Vérifier</button>
+            </div>
+            <div class="alert-inline alert-err" id="adminErr" style="margin-top:8px;"></div>
+        </div>
+    </div>
+    <div class="locked-overlay" id="lockedScreen"><div style="font-size:5rem;">🔒</div><h2 style="color:#dc2626;">ZENITH VERROUILLÉ</h2><p style="color:#64748b;">Contactez le super‑utilisateur.</p></div>
+
+    <!-- Ajout imprimante -->
+    <div class="modal-overlay" id="addPrinterModal">
+        <div class="modal-box">
+            <h3 style="margin-bottom:12px;"><i class="fas fa-plus-circle"></i> Nouvelle imprimante sur le Switch</h3>
+            <div style="display:flex;gap:8px;margin-bottom:10px;">
+                <label style="flex:1;text-align:center;padding:10px;background:#f8fafc;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;"><input type="radio" name="newConnType" value="USB" checked hidden> <i class="fas fa-plug"></i> USB</label>
+                <label style="flex:1;text-align:center;padding:10px;background:#f8fafc;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;"><input type="radio" name="newConnType" value="Bluetooth" hidden> <i class="fas fa-bluetooth"></i> BT</label>
+                <label style="flex:1;text-align:center;padding:10px;background:#f8fafc;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;"><input type="radio" name="newConnType" value="Réseau" hidden> <i class="fas fa-wifi"></i> Réseau</label>
+            </div>
+            <input type="text" id="newPrinterName" class="modal-input" placeholder="Nom de l'imprimante">
+            <input type="text" id="newPrinterModel" class="modal-input" placeholder="Modèle">
+            <div style="display:flex;gap:8px;">
+                <button class="btn-ghost" id="cancelAddPrinter" style="flex:1;">Annuler</button>
+                <button class="btn-primary" id="confirmAddPrinter" style="flex:1;">Ajouter au Switch</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ╔══════════════════════════════════════╗
+            // ║   ZENITH SWITCH • Engine v5.0      ║
+            // ╚══════════════════════════════════════╝
+
+            const GRILLE = {
+                couleur: { A4: 25, A3: 40, Lettre: 28, Legal: 30 },
+                nb: { A4: 15, A3: 25, Lettre: 18, Legal: 20 },
+                rectoverso: { A4: 17, A3: 28, Lettre: 20, Legal: 22 }
+            };
+            const TYPE_LABEL = { couleur: 'Couleur', nb: 'Noir & Blanc', rectoverso: 'Recto‑Verso' };
+            const ROOT = { nom: 'ZenithAdmin', email: 'admin@zenith.pro', tel: '+237600000000', pass: 'Zenith2024!' };
+            const MAX_MO = 10 * 1024 * 1024;
+
+            // État
+            let tentatives = 3,
+                verrouille = false;
+            let imprimantes = [
+                { id: 'p1', nom: 'HP LaserJet Pro', modele: 'M404dn', type: 'USB', statut: 'ready', pages: 0,
+                    defaut: true, switchPort: 1 },
+                { id: 'p2', nom: 'Canon PIXMA BT', modele: 'G3411', type: 'Bluetooth', statut: 'ready', pages: 0,
+                    defaut: false, switchPort: 2 },
+                { id: 'p3', nom: 'Epson EcoTank', modele: 'L3250', type: 'Réseau', statut: 'ready', pages: 0,
+                    defaut: false, switchPort: 3 }
+            ];
+            let fileAttente = [],
+                busy = false;
+            let fichierActuel = null,
+                nbPages = 0;
+
+            // Helpers DOM
+            const $ = (sel) => document.querySelector(sel);
+            const $$ = (sel) => document.querySelectorAll(sel);
+
+            // Persistance
+            function saveData() { localStorage.setItem('zenith_printers', JSON.stringify(imprimantes)); }
+
+            function loadData() {
+                const d = localStorage.getItem('zenith_printers');
+                if (d) imprimantes = JSON.parse(d);
+            }
+
+            function getHistory() { return JSON.parse(localStorage.getItem('zenith_hist') || '[]'); }
+
+            function saveHistory(entry) {
+                const h = getHistory();
+                h.unshift({ ...entry, id: Date.now(), date: entry.date || new Date().toISOString() });
+                if (h.length > 500) h.length = 500;
+                localStorage.setItem('zenith_hist', JSON.stringify(h));
+                refreshStats();
+                renderHistory();
+            }
+
+            function wipeHistory() {
+                localStorage.removeItem('zenith_hist');
+                imprimantes.forEach(p => p.pages = 0);
+                refreshStats();
+                renderHistory();
+                document.getElementById('feedList').innerHTML =
+                    '<div style="text-align:center;color:var(--text-muted);padding:20px;">En attente de travaux...</div>';
+                renderPrinters();
+            }
+
+            // Rendu imprimantes
+            function renderPrinters() {
+                const grid = document.getElementById('printerGrid');
+                const sel = document.getElementById('printerSelect');
+                grid.innerHTML = imprimantes.map(p => `
+                    <div class="printer-card ${p.defaut ? 'default' : ''}" data-id="${p.id}">
+                        <div class="printer-card-header">
+                            <div class="printer-card-icon ${p.type==='Bluetooth'?'bt':p.type==='USB'?'usb':'net'}"><i class="fas fa-print"></i></div>
+                            <div>
+                                <div class="printer-card-name">${p.nom} ${p.defaut ? '★' : ''}</div>
+                                <div class="printer-card-meta">Port switch #${p.switchPort} • ${p.type}</div>
+                            </div>
+                        </div>
+                        <div class="printer-card-status">
+                            <span class="badge-sm ${p.statut==='ready'?'badge-ready':p.statut==='busy'?'badge-busy':'badge-off'}">${p.statut==='ready'?'Prête':p.statut==='busy'?'Occupée':'Off'}</span>
+                            <span style="margin-left:8px;font-size:0.75rem;color:var(--text-muted);">📄 ${p.pages} p.</span>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Clic sur carte → définir par défaut
+                grid.querySelectorAll('.printer-card').forEach(card => {
+                    card.addEventListener('click', () => setDefault(card.dataset.id));
+                });
+
+                sel.innerHTML = '<option value="">Par défaut</option>' + imprimantes.filter(p => p.statut ===
+                    'ready').map(p => `<option value="${p.id}">${p.nom}</option>`).join('');
+                document.getElementById('printerCount').textContent = imprimantes.length;
+                saveData();
+            }
+
+            function setDefault(id) {
+                imprimantes.forEach(p => p.defaut = (p.id === id));
+                renderPrinters();
+            }
+
+            function getDefaultPrinter() {
+                return imprimantes.find(p => p.defaut && p.statut === 'ready') || imprimantes.find(p => p.statut ===
+                    'ready') || null;
+            }
+
+            // File d'attente
+            async function processQueue() {
+                if (busy || fileAttente.length === 0) return;
+                busy = true;
+                const job = fileAttente.shift();
+                const printer = imprimantes.find(p => p.id === job.printerId);
+                if (printer) printer.statut = 'busy';
+                renderPrinters();
+                await new Promise(r => setTimeout(r, Math.min(job.pages * 180, 4000)));
+                if (printer) { printer.statut = 'ready';
+                    printer.pages += job.pages * job.copies; }
+                busy = false;
+                renderPrinters();
+                if (fileAttente.length > 0) processQueue();
+            }
+
+            function addJob(job) { fileAttente.push(job);
+                processQueue(); }
+
+            // Détection externe
+            function externalDetection() {
+                const samples = [
+                    { n: 'Rapport_Annuel.pdf', p: 12, poste: 'PC-Comptabilité' }, { n: 'Facture_Client.docx', p: 3,
+                        poste: 'PC-Accueil' },
+                    { n: 'Contrat.pdf', p: 6, poste: 'PC-Direction' }, { n: 'Note_Service.doc', p: 2,
+                    poste: 'PC-RH' },
+                    { n: 'Plan_Batiment.pdf', p: 18, poste: 'PC-Architecte' }, { n: 'Memo.docx', p: 1,
+                        poste: 'PC-Stagiaire' }
+                ];
+
+                function trigger() {
+                    if (verrouille) return;
+                    const doc = samples[Math.floor(Math.random() * samples.length)];
+                    const type = ['couleur', 'nb', 'rectoverso'][Math.floor(Math.random() * 3)];
+                    const copies = Math.floor(Math.random() * 2) + 1;
+                    const fmt = ['A4', 'A3', 'Lettre', 'Legal'][Math.floor(Math.random() * 4)];
+                    const pu = GRILLE[type][fmt];
+                    const total = pu * doc.p * copies;
+                    const printer = getDefaultPrinter() || imprimantes.find(p => p.statut === 'ready');
+                    const entry = {
+                        nomFichier: doc.nom,
+                        pages: doc.p,
+                        type,
+                        copies,
+                        format: fmt,
+                        prixTotal: total,
+                        prixUnitaire: pu,
+                        numCommande: 'NET-' + Date.now().toString(36),
+                        source: 'Réseau',
+                        poste: doc.poste,
+                        estSysteme: true,
+                        printerId: printer?.id,
+                        printerName: printer?.nom || 'Inconnue',
+                        date: new Date().toISOString()
+                    };
+                    saveHistory(entry);
+                    feedAdd(entry);
+                    if (printer) addJob({ ...entry, printerId: printer.id });
+                }
+                setTimeout(trigger, 8000);
+                setInterval(() => { const d = Math.floor(Math.random() * 22000) + 10000;
+                    setTimeout(trigger, d); }, 38000);
+            }
+
+            function feedAdd(data) {
+                const c = document.getElementById('feedList');
+                if (c.querySelector('div[style]')) c.innerHTML = '';
+                const el = document.createElement('div');
+                el.className = `feed-item ${data.estSysteme ? 'external' : ''}`;
+                el.innerHTML = `
+                    <div style="width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;background:#e0e7ff;color:#4f46e5;flex-shrink:0;"><i class="fas fa-network-wired"></i></div>
+                    <div style="flex:1;min-width:0;"><strong>${data.nomFichier}</strong><br><span style="font-size:0.7rem;color:var(--text-muted);">Depuis ${data.poste||'Switch'} • ${data.printerName||'Auto'} • ${data.pages}p</span></div>
+                    ${data.prixTotal>0?`<span style="font-weight:700;color:#6366f1;font-family:monospace;">${data.prixTotal}F</span>`:''}`;
+                c.insertBefore(el, c.firstChild);
+                while (c.children.length > 20) c.lastChild.remove();
+            }
+
+            // Stats
+            function refreshStats() {
+                const h = getHistory();
+                const now = new Date(),
+                    today = now.toDateString();
+                const debutMois = new Date(now.getFullYear(), now.getMonth(), 1).toDateString();
+                const debutAn = new Date(now.getFullYear(), 0, 1).toDateString();
+                const todayItems = h.filter(x => new Date(x.date).toDateString() === today);
+                document.getElementById('todayPages').textContent = todayItems.reduce((s, x) => s + x.pages * x.copies,
+                    0);
+                document.getElementById('todayPrints').textContent = todayItems.length;
+                document.getElementById('todayRevenue').textContent = todayItems.reduce((s, x) => s + (x.prixTotal || 0),
+                    0) + ' F';
+                document.getElementById('monthRevenue').textContent = h.filter(x => new Date(x.date).toDateString() >=
+                    debutMois).reduce((s, x) => s + (x.prixTotal || 0), 0) + ' F';
+                document.getElementById('yearRevenue').textContent = h.filter(x => new Date(x.date).toDateString() >=
+                    debutAn).reduce((s, x) => s + (x.prixTotal || 0), 0) + ' F';
+                document.getElementById('histCount').textContent = h.length;
+            }
+
+            function renderHistory() {
+                const h = getHistory(),
+                    tbody = document.getElementById('histBody');
+                if (!h.length) { tbody.innerHTML =
+                        '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--text-muted);">Aucun travail d\'impression</td></tr>'; return; }
+                tbody.innerHTML = h.map(x => `<tr>
+                    <td>${new Date(x.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
+                    <td>${x.poste||'Local'}</td>
+                    <td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${x.nomFichier}</td>
+                    <td>${x.pages}</td><td>${TYPE_LABEL[x.type]||x.type}</td><td>${x.copies}</td>
+                    <td>${x.printerName||'N/A'}</td>
+                    <td style="font-weight:700;">${x.prixTotal||0}F</td>
+                </tr>`).join('');
+            }
+
+            // Upload
+            const dz = document.getElementById('dropzone'),
+                fi = document.getElementById('fileInput');
+            dz.addEventListener('click', () => fi.click());
+            fi.addEventListener('click', e => e.stopPropagation());
+            ['dragover', 'dragenter'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault();
+                dz.classList.add('active'); }));
+            ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault();
+                dz.classList.remove('active'); }));
+            dz.addEventListener('drop', e => { if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); });
+            fi.addEventListener('change', () => { if (fi.files.length) handleFile(fi.files[0]); });
+
+            async function handleFile(f) {
+                document.getElementById('fileErr').classList.remove('show');
+                if (f.size > MAX_MO) return showErr('fileErr', 'Fichier > 10 Mo');
+                if (!['pdf', 'doc', 'docx'].includes(f.name.split('.').pop().toLowerCase())) return showErr('fileErr',
+                    'Format interdit');
+                fichierActuel = f;
+                document.getElementById('fileOk').classList.add('show');
+                document.getElementById('fileOk').innerHTML =
+                    `<i class="fas fa-check-circle"></i> ${f.name} (${(f.size/1024/1024).toFixed(1)} Mo)`;
+                if (f.name.split('.').pop().toLowerCase() === 'pdf') {
+                    try { const buf = await f.arrayBuffer(); const pdf = await pdfjsLib.getDocument({ data: buf })
+                            .promise;
+                        nbPages = pdf.numPages;
+                        document.getElementById('manualBox').style.display = 'none';
+                        document.getElementById('fileOk').innerHTML +=
+                        ` • <strong>${nbPages} pages</strong>`; } catch (e) { showErr('fileErr', 'PDF illisible'); }
+                } else {
+                    try { const buf = await f.arrayBuffer(); const res = await mammoth.extractRawText({ arrayBuffer: buf });
+                        nbPages = Math.max(1, Math.ceil(res.value.length / 2500));
+                        document.getElementById('manualPages').value = nbPages;
+                        document.getElementById('manualBox').style.display = 'block';
+                        document.getElementById('fileOk').innerHTML +=
+                        ` • <strong>~${nbPages} pages</strong>`; } catch (e) { nbPages = 1;
+                        document.getElementById('manualBox').style.display = 'block'; }
+                }
+                document.getElementById('launchBtn').disabled = false;
+            }
+            document.getElementById('manualPages').addEventListener('input', function() {
+                if (fichierActuel && fichierActuel.name.split('.').pop().toLowerCase() !== 'pdf') nbPages = parseInt(
+                    this.value) || 1;
+            });
+
+            // Lancement
+            document.getElementById('launchBtn').addEventListener('click', () => {
+                if (!fichierActuel || nbPages <= 0) return showErr('validationErr', 'Fichier invalide');
+                let printerId = document.getElementById('printerSelect').value;
+                if (!printerId) { const def = getDefaultPrinter(); if (!def) return showErr('validationErr',
+                        'Aucune imprimante dispo');
+                    printerId = def.id; }
+                const printer = imprimantes.find(p => p.id === printerId);
+                if (!printer || printer.statut !== 'ready') return showErr('validationErr', 'Imprimante non prête');
+                const copies = parseInt(document.getElementById('copies').value);
+                if (isNaN(copies) || copies < 1 || copies > 100) return showErr('validationErr', 'Copies 1-100');
+                const type = document.querySelector('input[name="printType"]:checked').value;
+                const format = document.getElementById('format').value;
+                const pu = GRILLE[type][format];
+                const total = pu * nbPages * copies;
+                const cmd = 'ZEN-' + Date.now().toString(36).toUpperCase();
+                document.getElementById('rDate').textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'long',
+                    year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                document.getElementById('rOrder').textContent = cmd;
+                document.getElementById('rPrinter').textContent = printer.nom + ' (port #' + printer.switchPort +
+                    ')';
+                document.getElementById('rDoc').textContent = fichierActuel.name;
+                document.getElementById('rPages').textContent = nbPages + ' × ' + copies;
+                document.getElementById('rType').textContent = TYPE_LABEL[type];
+                document.getElementById('rTotal').textContent = total + ' FCFA';
+                document.getElementById('receiptCard').classList.add('show');
+                document.getElementById('noReceipt').style.display = 'none';
+                document.querySelector('[data-tab="receipt"]').click();
+                const entry = { nomFichier: fichierActuel.name, pages: nbPages, type, copies, format, prixTotal: total,
+                    prixUnitaire: pu, numCommande: cmd, source: 'Local', poste: 'Ce poste', estSysteme: false,
+                    printerId, printerName: printer.nom, date: new Date().toISOString() };
+                saveHistory(entry);
+                feedAdd(entry);
+                addJob({ ...entry, printerId });
+            });
+
+            // Tabs
+            $$('.tab').forEach(t => t.addEventListener('click', function() {
+                $$('.tab').forEach(x => x.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById('receiptPanel').classList.toggle('hidden', this.dataset.tab !==
+                    'receipt');
+                document.getElementById('historyPanel').classList.toggle('hidden', this.dataset.tab !==
+                    'history');
+                if (this.dataset.tab === 'history') renderHistory();
+            }));
+            document.getElementById('printReceiptBtn').addEventListener('click', () => window.print());
+
+            // Admin
+            document.getElementById('adminBtn').addEventListener('click', () => {
+                document.getElementById('adminModal').classList.add('active');
+                document.getElementById('attemptLeft').textContent = tentatives;
+            });
+            document.getElementById('cancelAdmin').addEventListener('click', () => { if (!verrouille) document
+                    .getElementById('adminModal').classList.remove('active'); });
+            document.getElementById('confirmAdmin').addEventListener('click', () => {
+                if (verrouille) return;
+                const n = document.getElementById('adminName').value.trim(),
+                    e = document.getElementById('adminEmail').value.trim(),
+                    t = document.getElementById('adminPhone').value.trim(),
+                    p = document.getElementById('adminPass').value;
+                if (!n || !e || !t || !p) return;
+                if (n === ROOT.nom && e === ROOT.email && t === ROOT.tel && p === ROOT.pass) { tentatives = 3;
+                    document.getElementById('adminModal').classList.remove('active');
+                    wipeHistory(); } else { tentatives--;
+                    document.getElementById('attemptLeft').textContent = tentatives; if (tentatives <= 0) { verrouille =
+                            true;
+                        document.getElementById('adminModal').classList.remove('active');
+                        document.getElementById('lockedScreen').classList.add('active'); } else { document
+                            .getElementById('adminErr').classList.add('show');
+                        document.getElementById('adminErr').innerHTML = '❌ Identifiants incorrects'; } }
+            });
+
+            // Ajout imprimante
+            document.getElementById('addPrinterBtn').addEventListener('click', () => document.getElementById(
+                'addPrinterModal').classList.add('active'));
+            document.getElementById('cancelAddPrinter').addEventListener('click', () => document.getElementById(
+                'addPrinterModal').classList.remove('active'));
+            document.getElementById('confirmAddPrinter').addEventListener('click', () => {
+                const nom = document.getElementById('newPrinterName').value.trim(),
+                    modele = document.getElementById('newPrinterModel').value.trim(),
+                    type = document.querySelector('input[name="newConnType"]:checked').value;
+                if (!nom || !modele) return;
+                imprimantes.push({ id: 'p' + Date.now(), nom, modele, type, statut: 'ready', pages: 0,
+                    defaut: false, switchPort: imprimantes.length + 1 });
+                renderPrinters();
+                document.getElementById('addPrinterModal').classList.remove('active');
+            });
+
+            // Export CSV
+            document.getElementById('exportCsv').addEventListener('click', () => {
+                const h = getHistory();
+                if (!h.length) return;
+                let csv = 'Date,Poste,Document,Pages,Type,Copies,Imprimante,Total\n';
+                h.forEach(x => csv +=
+                    `"${new Date(x.date).toLocaleString('fr-FR')}","${x.poste||'Local'}","${x.nomFichier}",${x.pages},"${TYPE_LABEL[x.type]||x.type}",${x.copies},"${x.printerName||''}",${x.prixTotal||0}\n`
+                    );
+                const b = new Blob(['\ufeff' + csv], { type: 'text/csv' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(b);
+                a.download = 'zenith_switch_' + new Date().toISOString().slice(0, 10) + '.csv';
+                a.click();
+            });
+
+            // Protections
+            window.addEventListener('beforeunload', e => { e.preventDefault();
+                e.returnValue = ''; });
+            document.addEventListener('keydown', e => { if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I', 'J',
+                        'C'
+                    ].includes(e.key)) || (e.ctrlKey && e.key === 'u')) e.preventDefault(); });
+            document.addEventListener('contextmenu', e => e.preventDefault());
+
+            function showErr(id, msg) { const el = document.getElementById(id);
+                el.innerHTML = msg;
+                el.classList.add('show');
+                setTimeout(() => el.classList.remove('show'), 4500); }
+
+            // Init
+            loadData();
+            renderPrinters();
+            refreshStats();
+            renderHistory();
+            externalDetection();
+            document.getElementById('launchBtn').disabled = true;
+            console.log('🌐 ZENITH SWITCH • Tous les postes reliés • Détection réseau • Imprimantes partagées');
+        })();
+    </script>
+</body>
+</html>
